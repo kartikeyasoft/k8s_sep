@@ -566,8 +566,164 @@ kubectl get tigerastatus
 
 
 
-Expected result
 
-&#x20;Calico should detect the unique Host-Only IP on each VM instead of the shared NAT IP `10.0.3.15`.
+## **1. Recommended startup architecture**
 
+**VirtualBox host starts**
+
+**Master**
+
+`192.168.56.10`
+
+**Workers**
+
+`.11`, `.12`, `.13`
+
+**Startup service on each VM**
+
+- Wait for Host-Only network
+- Start containerd
+- Start kubelet
+- Verify Kubernetes connectivity
+
+Expected
+
+**Kubernetes cluster becomes Ready**
+
+## **2. First enable automatic service startup**
+
+Execute on all four VMs:
+
+```
+sudo systemctl enable containerd
+sudo systemctl enable kubelet
+```
+
+Check:
+
+```
+systemctl is-enabled containerd
+systemctl is-enabled kubelet
+```
+
+Both should return `enabled`.
+
+## **3. Create a startup script**
+
+Create this file on each VM:
+
+```
+sudo nano /usr/local/bin/k8s-node-startup.sh
+```
+
+Paste:
+
+```
+#!/bin/bash
+
+LOGFILE="/var/log/k8s-node-startup.log"
+
+exec >> "$LOGFILE" 2>&1
+
+echo "================================="
+echo "Kubernetes startup: $(date)"
+echo "================================="
+
+# Wait for Host-Only network
+for i in {1..60}; do
+    if ip -4 addr show enp0s3 | grep -q "192.168.56."; then
+        echo "Host-Only network is ready"
+        break
+    fi
+    sleep 2
+done
+
+# Start container runtime
+systemctl start containerd
+
+# Start Kubernetes kubelet
+systemctl start kubelet
+
+echo "Kubernetes startup checks completed"
+```
+
+Save and execute:
+
+```
+sudo chmod +x /usr/local/bin/k8s-node-startup.sh
+```
+
+## **4. Create a systemd service**
+
+```
+sudo nano /etc/systemd/system/k8s-node-startup.service
+```
+
+Paste:
+
+```
+[Unit]
+Description=Kubernetes Node Startup Preparation
+After=network-online.target containerd.service
+Wants=network-online.target
+Requires=containerd.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/k8s-node-startup.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Enable it:
+
+```
+sudo systemctl daemon-reload
+
+sudo systemctl enable k8s-node-startup.service
+```
+
+## **5. Test the service**
+
+```
+sudo systemctl start k8s-node-startup.service
+
+sudo systemctl status k8s-node-startup.service
+```
+
+View the log:
+
+```
+sudo cat /var/log/k8s-node-startup.log
+```
+
+Repeat on master, worker1, worker2 and worker3.
+
+## **6. Important: Start VirtualBox VMs in the correct order**
+
+My recommendation:
+
+1. Start master.
+2. Wait until its API server is available.
+3. Start worker1.
+4. Start worker2.
+5. Start worker3.
+
+You can also automate the VirtualBox VM startup order from the host machine separately.
+
+**One important distinction:** This startup script does not repair Calico IP conflicts or guarantee that all pods are healthy. Those are cluster configuration issues we must resolve separately. Your Calico configuration should use `enp0s3` as discussed earlier.
+
+## **My recommendation**
+
+For a production-style home lab, use:
+
+- systemd for automatic service startup.
+- containerd and kubelet enabled at boot.
+- Calico interface autodetection pinned to `enp0s3`.
+- VirtualBox automatic VM startup in the correct order.
+- Kubernetes health checks after boot.
+
+This provides a much more reliable restart process than manually starting services every time.
 
