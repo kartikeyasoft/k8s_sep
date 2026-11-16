@@ -1,4 +1,62 @@
 
+## **4. Fix hostnames first**
+
+On Master, keep:
+
+```
+hostnamectl set-hostname kartikeyasoft
+```
+
+On Worker1:
+
+```
+sudo hostnamectl set-hostname worker1
+```
+
+On Worker2:
+
+```
+sudo hostnamectl set-hostname worker2
+```
+
+Check on each machine:
+
+```
+hostname
+```
+
+Expected:
+
+```
+Master:   kartikeyasoft
+Worker1:  worker1
+Worker2:  worker2
+```
+
+## **5. Configure&#x20;**`/etc/hosts`**&#x20;on all three machines**
+
+Execute:
+
+```
+sudo nano /etc/hosts
+```
+
+Make sure these entries exist on all three:
+
+```
+127.0.0.1 localhost
+127.0.1.1 kartikeyasoft
+
+192.168.56.10 kartikeyasoft
+192.168.56.11 worker1
+192.168.56.12 worker2
+```
+
+Remove conflicting old hostname mappings, if present. Keep the existing IPv6 localhost entries.
+
+
+---------------------------------------------------
+
 
 ## **1. Correct Master Netplan configuration**
 
