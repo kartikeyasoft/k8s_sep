@@ -1,5 +1,5 @@
 
-## **4. Fix hostnames first**
+## **1. Fix hostnames first**
 
 On Master, keep:
 
@@ -33,7 +33,7 @@ Worker1:  worker1
 Worker2:  worker2
 ```
 
-## **5. Configure&#x20;**`/etc/hosts`**&#x20;on all three machines**
+## **2. Configure&#x20;**`/etc/hosts`**&#x20;on all three machines**
 
 Execute:
 
