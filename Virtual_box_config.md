@@ -45,9 +45,9 @@ Make sure these entries exist on all three:
 
 ```
 127.0.0.1 localhost
-127.0.1.1 kartikeyasoft
+127.0.1.1 master
 
-192.168.56.10 kartikeyasoft
+192.168.56.10 master
 192.168.56.11 worker1
 192.168.56.12 worker2
 ```
