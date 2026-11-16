@@ -162,7 +162,8 @@ ip -4 addr show enp0s3
 ip -4 addr show enp0s8
 ```
 
-Then we'll finish Worker2 and move to Kubernetes endpoint correction.
+
+------------------------------------------------------------------------------------------------------
 
 
 
