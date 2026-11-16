@@ -410,4 +410,164 @@ Service CIDR: 10.96.0.0/12
 
 After successful initialization, we will configure kubectl and install Calico.
 
+Yes, this command installs **Calico CNI (Container Network Interface)**, which provides Pod-to-Pod networking and NetworkPolicy support in Kubernetes.
+
+However, I recommend using **Calico v3.33.0 instead of v3.30.0** for your Kubernetes v1.36.6 cluster. The current Calico documentation tests v3.33 against Kubernetes 1.36.&#x20;
+
+[image](https://www.google.com/s2/favicons?domain=https://docs.tigera.io\&sz=32)
+
+Calico Documentation+1
+
+
+
+### **1. Important: Run this only after successful&#x20;**`kubeadm init`
+
+On your Master, first verify:
+
+```
+kubectl get nodes
+kubectl get pods -n kube-system
+```
+
+If the API Server is running and kubectl works, proceed.
+
+### **2. Install Calico**
+
+For your new cluster, I recommend the documented Tigera Operator installation rather than the older standalone manifest.
+
+Run on Master:
+
+```
+kubectl create -f \
+https://raw.githubusercontent.com/projectcalico/calico/v3.33.0/manifests/v3_projectcalico_org.yaml
+```
+
+```
+kubectl create -f \
+https://raw.githubusercontent.com/projectcalico/calico/v3.33.0/manifests/tigera-operator.yaml
+```
+
+Download the custom resources:
+
+```
+curl -O \
+https://raw.githubusercontent.com/projectcalico/calico/v3.33.0/manifests/custom-resources.yaml
+```
+
+Change the default Pod CIDR to match your kubeadm configuration:
+
+```
+sed -i 's/192.168.0.0\/16/10.244.0.0\/16/g' custom-resources.yaml
+```
+
+Verify:
+
+```
+grep -n 'cidr:' custom-resources.yaml
+```
+
+Expected:
+
+```
+cidr: 10.244.0.0/16
+```
+
+Apply:
+
+```
+kubectl create -f custom-resources.yaml
+```
+
+These steps follow Calico's documented operator installation approach.&#x20;
+
+[image](https://www.google.com/s2/favicons?domain=https://docs.tigera.io\&sz=32)
+
+Calico Documentation+1
+
+
+
+### **3. Verify Calico**
+
+```
+kubectl get pods -n tigera-operator
+kubectl get pods -n calico-system
+kubectl get tigerastatus
+kubectl get nodes -o wide
+```
+
+Wait until the Calico components are healthy and the Master becomes `Ready`.
+
+Your current next step
+
+Your earlier Master initialization failed because the old control-plane ports and etcd data were still present. The Worker3 join also reported a containerd CRI problem.
+
+**Have you successfully completed a fresh&#x20;**`kubeadm init`**&#x20;on Master yet?**
+
+Don't apply the Calico manifest or operator until the new Master API Server is initialized and healthy.
+
+
+
+I found the issue. Your existing Calico configuration has:
+
+```
+nodeAddressAutodetectionV4:
+  firstFound: true
+```
+
+When we added `interface: enp0s3`, both detection methods remained enabled. Calico allows only one autodetection method at a time.
+
+We need to **replace&#x20;**`firstFound`**&#x20;with&#x20;**`interface`, not add another method.
+
+## **Step 1: Correct the configuration**
+
+Run this command on `master`:
+
+```
+kubectl patch installation default --type=json \
+-p='[
+  {"op":"remove","path":"/spec/calicoNetwork/nodeAddressAutodetectionV4/firstFound"},
+  {"op":"add","path":"/spec/calicoNetwork/nodeAddressAutodetectionV4/interface","value":"enp0s3"}
+]'
+```
+
+Expected response:
+
+```
+installation.operator.tigera.io/default patched
+```
+
+## **Step 2: Verify**
+
+```
+kubectl get installation default -o yaml
+```
+
+You should now see:
+
+```
+nodeAddressAutodetectionV4:
+  interface: enp0s3
+```
+
+There should be no `firstFound: true`.
+
+## **Step 3: Monitor Calico**
+
+```
+kubectl get pods -n calico-system -w
+```
+
+Once the pods settle, check:
+
+```
+kubectl get nodes -o wide
+kubectl get tigerastatus
+```
+
+
+
+Expected result
+
+&#x20;Calico should detect the unique Host-Only IP on each VM instead of the shared NAT IP `10.0.3.15`.
+
 
